@@ -1,0 +1,5 @@
+rootProject.name='wanandroid'
+include ':app'
+include ':library_base'
+include ':module_home'
+include ':library_imageloader'
