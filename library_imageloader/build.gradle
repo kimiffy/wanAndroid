@@ -1,4 +1,5 @@
 apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
 
 android {
     compileSdkVersion rootProject.ext.android.compileSdkVersion
@@ -28,4 +29,9 @@ android {
 dependencies {
     api rootProject.ext.dependencies["glide"]
     annotationProcessor rootProject.ext.dependencies["glide-compiler"]
+    api rootProject.ext.androidx["ktx"]
+    api rootProject.ext.androidx["kotlin-stdlib"]
+}
+repositories {
+    mavenCentral()
 }

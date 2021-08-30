@@ -12,7 +12,7 @@ ext {
 
     //version 版本控制
     versions = [
-
+            "kotlin_version": "1.4.32"
     ]
 
     //androidx支持库配置
@@ -24,6 +24,8 @@ ext {
             "material"           : "com.google.android.material:material:1.2.1",
             "navigation-fragment": "androidx.navigation:navigation-fragment:2.3.2",
             "navigation-ui"      : "androidx.navigation:navigation-ui:2.3.2",
+            "ktx"                : "androidx.core:core-ktx:1.3.2",
+            "kotlin-stdlib"      : "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${versions.kotlin_version}",
     ]
 
     //依赖第三方配置
