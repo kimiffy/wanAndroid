@@ -1,2 +1,2 @@
 # wanAndroid
-mvvm 组件化
+mvvm
