@@ -25,8 +25,8 @@ import com.bumptech.glide.load.resource.bitmap.CircleCrop
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.signature.ObjectKey
-import com.kimiffy.library_imageloader.R
 import java.io.File
+import java.lang.ref.WeakReference
 import java.util.*
 
 
@@ -43,7 +43,7 @@ import java.util.*
  */
 class ImageLoader() {
 
-    private var context: Context? = null
+    private var context: WeakReference<Context>? = null
 
     private var loadUrl: String? = null
 
@@ -143,7 +143,7 @@ class ImageLoader() {
 
 
     private constructor(context: Context) : this() {
-        this.context = context
+        this.context = WeakReference<Context>(context)
     }
 
 
@@ -159,14 +159,14 @@ class ImageLoader() {
      * 清除内存缓存,需要在主线程执行
      */
     fun clearMemoryCache() {
-        context?.let { Glide.get(it).clearMemory() }
+        context?.get()?.let { Glide.get(it).clearMemory() }
     }
 
     /**
      * 清除磁盘缓存,需要在子线程执行
      */
     fun clearDiskCache() {
-        context?.let { Glide.get(it).clearDiskCache() }
+        context?.get()?.let { Glide.get(it).clearDiskCache() }
     }
 
 
@@ -437,55 +437,56 @@ class ImageLoader() {
         if (loadUrl.isNullOrEmpty() && null == loadFile && null == loadUri && null == loadBitmap && null == loadResourceId) {
             return null
         }
-        if (null == context || Utils.isDestroy(context)) {
+        if (null == context || Utils.isDestroy(context?.get())) {
             return null
         }
         if (wifiLoad && !loadUrl.isNullOrEmpty() && Utils.isHttpUrl(loadUrl)) {
-            if (ImageLoaderGlobalConfig.loadImageOnlyInWifi && !Utils.isWifiConnected(context)) {
+            if (ImageLoaderGlobalConfig.loadImageOnlyInWifi && !Utils.isWifiConnected(context?.get())) {
                 return null
             }
         }
         val requestBuilder: RequestBuilder<*>?
-        val requestManager: RequestManager = Glide.with(context!!)
+
+        val requestManager: RequestManager? = context?.get()?.let { Glide.with(it) }
 
         requestBuilder = when (asImageType) {
             asFile -> {
-                requestManager.asFile()
+                requestManager?.asFile()
             }
             asBitmap -> {
-                requestManager.asBitmap()
+                requestManager?.asBitmap()
             }
             asGif -> {
-                requestManager.asGif()
+                requestManager?.asGif()
             }
             asDrawable -> {
-                requestManager.asDrawable()
+                requestManager?.asDrawable()
             }
             else -> {
-                requestManager.asDrawable()
+                requestManager?.asDrawable()
             }
         }
 
         when {
             loadUrl?.isNotEmpty() == true -> {
-                requestBuilder.load(loadUrl)
+                requestBuilder?.load(loadUrl)
             }
             null != loadUri -> {
-                requestBuilder.load(loadUri)
+                requestBuilder?.load(loadUri)
             }
             null != loadFile -> {
-                requestBuilder.load(loadFile)
+                requestBuilder?.load(loadFile)
             }
             null != loadBitmap -> {
-                requestBuilder.load(loadBitmap)
+                requestBuilder?.load(loadBitmap)
             }
             null != loadDrawable -> {
-                requestBuilder.load(loadDrawable)
+                requestBuilder?.load(loadDrawable)
             }
             null != loadResourceId -> {
-                requestBuilder.load(loadResourceId)
+                requestBuilder?.load(loadResourceId)
             }
-            else -> requestBuilder.load(loadUrl)
+            else -> requestBuilder?.load(loadUrl)
         }
 
         return requestBuilder
