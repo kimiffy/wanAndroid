@@ -19,11 +19,17 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.Priority
 import com.bumptech.glide.RequestBuilder
 import com.bumptech.glide.RequestManager
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.MultiTransformation
 import com.bumptech.glide.load.Transformation
 import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.load.resource.bitmap.CircleCrop
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+import com.bumptech.glide.load.resource.gif.GifDrawable
+import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.RequestOptions
+import com.bumptech.glide.request.target.Target
 import com.bumptech.glide.signature.ObjectKey
 import java.io.File
 import java.lang.ref.WeakReference
@@ -68,6 +74,9 @@ class ImageLoader() {
     //高斯模糊值, 值越大模糊效果越大 (0~25)
     private var blurValue = 0
 
+    //高斯模糊采样率
+    private var sampling = 0
+
     //过渡图
     private var placeHolder = 0
 
@@ -109,8 +118,7 @@ class ImageLoader() {
     private var borderColor = Color.BLACK
 
     //变换
-    private var transformations: Transformation<Bitmap?>? = null
-
+    private var transformations: Collection<Transformation<Bitmap?>?>? = null
 
     //缩略图比例 (0~1之间)
     private var sizeMultiplier = 1f
@@ -140,6 +148,11 @@ class ImageLoader() {
      * 是否禁止gif动画
      */
     private var dontAnimate = false
+
+    /**
+     * 图片加载监听
+     */
+    private var requestListener: ImageRequestListener? = null
 
 
     private constructor(context: Context) : this() {
@@ -267,8 +280,9 @@ class ImageLoader() {
     /**
      * 模糊变换
      */
-    fun blur(blurValue: Int) = apply {
+    fun blur(blurValue: Int, sampling: Int = 1) = apply {
         this.blurValue = blurValue
+        this.sampling = sampling
     }
 
     /**
@@ -288,8 +302,9 @@ class ImageLoader() {
     /**
      * 变换
      */
-    fun transform(transformations: Transformation<Bitmap?>) = apply {
-        this.transformations = transformations
+    fun transforms(vararg transformations: Transformation<Bitmap?>) = apply {
+        val array = listOf<Transformation<Bitmap?>?>(*transformations)
+        this.transformations = array
     }
 
     /**
@@ -320,6 +335,13 @@ class ImageLoader() {
         this.dontAnimate = dontAnimate
     }
 
+
+    /**
+     * 设置加载监听
+     */
+    fun listener(imageRequestListener: ImageRequestListener) = apply {
+        requestListener = imageRequestListener
+    }
 
     fun into(imageView: ImageView?): ImageLoader {
         if (imageView == null) {
@@ -395,7 +417,7 @@ class ImageLoader() {
         }
         //高斯模糊
         if (blurValue != 0) {
-            requestOptions.transform(BlurTransformation(blurValue))
+            requestOptions.transform(BlurTransformation(blurValue, sampling))
         }
 
         //剪裁类型
@@ -418,8 +440,8 @@ class ImageLoader() {
         requestOptions.priority(priority)
 
         //变换
-        if (transformations != null) {
-            requestOptions.transform(transformations)
+        if (transformations != null && transformations!!.isNotEmpty()) {
+            requestOptions.transform(MultiTransformation<Bitmap>(transformations!!))
         }
 
         if (dontAnimate) {
@@ -449,22 +471,68 @@ class ImageLoader() {
 
         val requestManager: RequestManager? = context?.get()?.let { Glide.with(it) }
 
-        requestBuilder = when (asImageType) {
+        when (asImageType) {
             asFile -> {
-                requestManager?.asFile()
+                requestBuilder = requestManager?.asFile()
+                requestListener?.apply {
+                    onBefore()
+                    requestBuilder?.listener(object : RequestListener<File?> {
+                        override fun onLoadFailed(e: GlideException?, o: Any, target: Target<File?>, b: Boolean): Boolean {
+                            return onException(e)
+                        }
+
+                        override fun onResourceReady(resource: File?, model: Any, target: Target<File?>, dataSource: DataSource, isFirstResource: Boolean): Boolean {
+                            return onResourceReady(resource, dataSource == DataSource.MEMORY_CACHE, isFirstResource)
+                        }
+                    })
+                }
             }
             asBitmap -> {
-                requestManager?.asBitmap()
+                requestBuilder = requestManager?.asBitmap()
+                requestListener?.apply {
+                    onBefore()
+                    requestBuilder?.listener(object : RequestListener<Bitmap?> {
+                        override fun onLoadFailed(e: GlideException?, o: Any, target: Target<Bitmap?>, b: Boolean): Boolean {
+                            return onException(e)
+                        }
+
+                        override fun onResourceReady(resource: Bitmap?, model: Any, target: Target<Bitmap?>, dataSource: DataSource, isFirstResource: Boolean): Boolean {
+                            return onResourceReady(resource, dataSource == DataSource.MEMORY_CACHE, isFirstResource)
+                        }
+                    })
+                }
             }
             asGif -> {
-                requestManager?.asGif()
-            }
-            asDrawable -> {
-                requestManager?.asDrawable()
+                requestBuilder = requestManager?.asGif()
+                requestListener?.apply {
+                    onBefore()
+                    requestBuilder?.listener(object : RequestListener<GifDrawable?> {
+                        override fun onLoadFailed(e: GlideException?, o: Any, target: Target<GifDrawable?>, b: Boolean): Boolean {
+                            return onException(e)
+                        }
+
+                        override fun onResourceReady(resource: GifDrawable?, model: Any, target: Target<GifDrawable?>, dataSource: DataSource, isFirstResource: Boolean): Boolean {
+                            return onResourceReady(resource, dataSource == DataSource.MEMORY_CACHE, isFirstResource)
+                        }
+                    })
+                }
             }
             else -> {
-                requestManager?.asDrawable()
+                requestBuilder = requestManager?.asDrawable()
+                requestListener?.apply {
+                    onBefore()
+                    requestBuilder?.listener(object : RequestListener<Drawable?> {
+                        override fun onLoadFailed(e: GlideException?, o: Any, target: Target<Drawable?>, b: Boolean): Boolean {
+                            return onException(e)
+                        }
+
+                        override fun onResourceReady(resource: Drawable?, model: Any, target: Target<Drawable?>, dataSource: DataSource, isFirstResource: Boolean): Boolean {
+                            return onResourceReady(resource, dataSource == DataSource.MEMORY_CACHE, isFirstResource)
+                        }
+                    })
+                }
             }
+
         }
 
         when {
@@ -492,6 +560,29 @@ class ImageLoader() {
         return requestBuilder
     }
 
+
+    interface ImageRequestListener {
+        /**
+         * 加载资源图片开始
+         */
+        fun onBefore()
+
+        /**
+         * 资源图片准备完成
+         *
+         * @param resource
+         * @param isFromMemoryCache
+         * @param isFirstResource
+         */
+        fun onResourceReady(resource: Any?, isFromMemoryCache: Boolean, isFirstResource: Boolean): Boolean
+
+        /**
+         * 加载图片出错
+         *
+         * @param error
+         */
+        fun onException(error: Exception?): Boolean
+    }
 }
 
 
